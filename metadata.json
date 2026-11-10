@@ -1,0 +1,6 @@
+{
+  "name": "GeoPulse World Map & Location Template",
+  "description": "An interactive world map and location explorer built with OpenStreetMap and Leaflet, featuring geolocation, Nominatim search, real-time weather, timezones, and bookmarks with zero API costs.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

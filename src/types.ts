@@ -8,6 +8,7 @@ export interface UserProfile {
   tenantSubProfit: number;
   userSubProfit: number;
   referralCode: string;
+  hasCompletedOnboarding: boolean;
 }
 
 export interface LocationPoint {

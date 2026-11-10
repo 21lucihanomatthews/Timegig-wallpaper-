@@ -18,7 +18,7 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email'])
-        && data.keys().hasOnly(['uid', 'name', 'surname', 'email', 'phone', 'totalProfit', 'tenantSubProfit', 'userSubProfit', 'referralCode'])
+        && data.keys().hasOnly(['uid', 'name', 'surname', 'email', 'phone', 'totalProfit', 'tenantSubProfit', 'userSubProfit', 'referralCode', 'hasCompletedOnboarding', 'subscriptionTier', 'verificationStatus', 'verificationSelfieUrl', 'verificationIdUrl', 'verificationPaymentUrl', 'verificationRequestedAt'])
         && data.uid == request.auth.uid
         && data.email is string && data.email.size() <= 255
         && (data.name == null || (data.name is string && data.name.size() <= 100))
@@ -27,7 +27,10 @@ service cloud.firestore {
         && (data.totalProfit == null || data.totalProfit is number)
         && (data.tenantSubProfit == null || data.tenantSubProfit is number)
         && (data.userSubProfit == null || data.userSubProfit is number)
-        && (data.referralCode == null || (data.referralCode is string && data.referralCode.size() <= 50));
+        && (data.referralCode == null || (data.referralCode is string && data.referralCode.size() <= 50))
+        && (data.hasCompletedOnboarding == null || data.hasCompletedOnboarding is bool)
+        && (data.subscriptionTier == null || data.subscriptionTier in ['none', 'basic', 'pro'])
+        && (data.verificationStatus == null || data.verificationStatus in ['none', 'pending', 'approved', 'rejected']);
     }
 
     function isValidReferral(data) {
@@ -52,9 +55,11 @@ service cloud.firestore {
 
     function isValidGig(data) {
       return data.keys().hasAll(['id', 'seekerId', 'status'])
-        && data.keys().hasOnly(['id', 'seekerId', 'seekerName', 'seekerService', 'seekerRate', 'seekerSelfieUrl', 'status', 'totalCost', 'hours', 'distanceKm', 'etaMinutes', 'ratingGiven', 'reviewGiven', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'seekerId', 'seekerName', 'seekerService', 'seekerRate', 'seekerSelfieUrl', 'status', 'totalCost', 'hours', 'distanceKm', 'etaMinutes', 'ratingGiven', 'reviewGiven', 'cancelledBy', 'cancellationReason', 'createdAt', 'updatedAt'])
         && data.id is string && data.id.size() <= 128
-        && data.status in ['waiting_acceptance', 'in_progress', 'completed', 'cancelled'];
+        && data.status in ['waiting_acceptance', 'in_progress', 'completed', 'cancelled']
+        && (data.cancelledBy == null || data.cancelledBy in ['user', 'seeker'])
+        && (data.cancellationReason == null || (data.cancellationReason is string && data.cancellationReason.size() <= 500));
     }
 
     function isValidLocation(data) {

@@ -25,6 +25,9 @@ interface UserProfile {
   tenantSubProfit: number;
   userSubProfit: number;
   referralCode: string;
+  hasCompletedOnboarding: boolean;
+  subscriptionTier: 'none' | 'basic' | 'pro';
+  verificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
 }
 
 interface FirebaseContextType {
@@ -65,7 +68,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             totalProfit: 0,
             tenantSubProfit: 0,
             userSubProfit: 0,
-            referralCode: `GEO-${currentUser.uid.slice(0, 6).toUpperCase()}`
+            referralCode: `GEO-${currentUser.uid.slice(0, 6).toUpperCase()}`,
+            hasCompletedOnboarding: false,
+            subscriptionTier: 'none'
           };
           try {
             await setDoc(userDocRef, newProfile);

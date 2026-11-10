@@ -1,4 +1,4 @@
-# Firebase Security Specification - GeoPulse
+# Firebase Security Specification - TimeGiG
 
 ## Data Invariants
 1. **User Profile**: A user can only manage their own profile. Profile UIDs must match the authenticated UID.

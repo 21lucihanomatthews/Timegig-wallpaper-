@@ -116,8 +116,8 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
   const handleShareLink = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Join my Tenant Network on GeoPulse',
-        text: 'Join my Tenant Network on GeoPulse and start earning sub-profit dividends:',
+        title: 'Join my Tenant Network on TimeGiG',
+        text: 'Join my Tenant Network on TimeGiG and start earning sub-profit dividends:',
         url: tenantReferralLink,
       }).catch(() => {});
     } else {
@@ -536,24 +536,24 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
             )}
 
             {/* Referrals Header Card */}
-            <div className="bg-white/95 backdrop-blur-md rounded-3xl p-5 border border-white/70 shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-white/70 shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="p-2 bg-blue-100 text-blue-700 rounded-xl font-bold">
-                      <Link2 className="w-4 h-4" />
+                    <span className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
+                      <Link2 className="w-3.5 h-3.5" />
                     </span>
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">Tenant Referral Applications</h3>
-                      <p className="text-xs text-slate-500">
-                        Showing only referrals joined via link: <span className="font-mono font-semibold text-blue-600">{userProfile?.referralCode || 'GEO-XXXXXX'}</span>
+                      <h3 className="text-sm font-bold text-slate-900">Tenant Referral Applications</h3>
+                      <p className="text-[10px] text-slate-500">
+                        Joined via link: <span className="font-mono font-semibold text-blue-600">{userProfile?.referralCode || 'GEO-XXXXXX'}</span>
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                     {filteredReferrals.length} Joined Referrals
                   </span>
                 </div>

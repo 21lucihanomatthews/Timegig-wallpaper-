@@ -2,7 +2,7 @@
   "entities": {
     "User": {
       "title": "User Profile",
-      "description": "The profile data for a GeoPulse user.",
+      "description": "The profile data for a TimeGiG user.",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
@@ -13,7 +13,14 @@
         "totalProfit": { "type": "number" },
         "tenantSubProfit": { "type": "number" },
         "userSubProfit": { "type": "number" },
-        "referralCode": { "type": "string", "maxLength": 50 }
+        "referralCode": { "type": "string", "maxLength": 50 },
+        "hasCompletedOnboarding": { "type": "boolean" },
+        "subscriptionTier": { "type": "string", "enum": ["none", "basic", "pro"] },
+        "verificationStatus": { "type": "string", "enum": ["none", "pending", "approved", "rejected"] },
+        "verificationSelfieUrl": { "type": "string" },
+        "verificationIdUrl": { "type": "string" },
+        "verificationPaymentUrl": { "type": "string" },
+        "verificationRequestedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email"]
     },
@@ -66,6 +73,8 @@
         "etaMinutes": { "type": "number" },
         "ratingGiven": { "type": "number" },
         "reviewGiven": { "type": "string" },
+        "cancelledBy": { "type": "string", "enum": ["user", "seeker"] },
+        "cancellationReason": { "type": "string", "maxLength": 500 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },

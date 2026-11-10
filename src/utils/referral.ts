@@ -11,7 +11,8 @@ export async function registerReferralToTenant(
   providedRefCode?: string,
   name?: string,
   surname?: string,
-  phone?: string
+  phone?: string,
+  subscriptionTier: 'none' | 'basic' | 'pro' = 'none'
 ) {
   const code = (providedRefCode || localStorage.getItem('timegig_tenant_ref') || '').trim().toUpperCase();
   if (!code) return;
@@ -44,6 +45,8 @@ export async function registerReferralToTenant(
           joinedDate: dateStr,
           referralCode: code,
           status: 'pending',
+          subscriptionTier: subscriptionTier,
+          subscriptionActivated: subscriptionTier !== 'none',
           selfieUrl: `https://images.unsplash.com/photo-${1534528741775 + (Math.floor(Math.random() * 1000))}?w=150&auto=format&fit=crop&q=80`,
           documents: [
             {
@@ -66,14 +69,56 @@ export async function registerReferralToTenant(
         });
         console.log(`Referral ${newUserId} successfully linked to tenant ${tenantUid}`);
       } else {
-        // If referral record exists, update profile info if changed
+        // If referral record exists, update profile info or subscription status if changed
         const data = existingRef.data();
-        if (fullName && data.name !== fullName) {
-          await setDoc(refDocRef, { name: fullName, phone: phone || data.phone || '' }, { merge: true });
+        const updatePayload: any = {};
+        if (fullName && data.name !== fullName) updatePayload.name = fullName;
+        if (phone && data.phone !== phone) updatePayload.phone = phone;
+        if (subscriptionTier !== 'none' && data.subscriptionTier !== subscriptionTier) {
+          updatePayload.subscriptionTier = subscriptionTier;
+          updatePayload.subscriptionActivated = true;
+        }
+        if (Object.keys(updatePayload).length > 0) {
+          await setDoc(refDocRef, updatePayload, { merge: true });
         }
       }
     }
   } catch (err) {
     console.error('Error linking referral to tenant:', err);
+  }
+}
+
+/**
+ * Updates the referral's subscription tier and activation status on the referring tenant's document
+ * when the referral user selects/activates a subscription plan.
+ */
+export async function updateReferralSubscriptionStatus(userId: string, tier: 'basic' | 'pro') {
+  const code = (localStorage.getItem('timegig_tenant_ref') || '').trim().toUpperCase();
+  if (!code) return;
+
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('referralCode', '==', code));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const tenantDoc = snap.docs[0];
+      const tenantUid = tenantDoc.id;
+
+      if (tenantUid === userId) return;
+
+      const refDocRef = doc(db, 'users', tenantUid, 'referrals', userId);
+      const refDoc = await getDoc(refDocRef);
+
+      if (refDoc.exists()) {
+        await setDoc(refDocRef, {
+          subscriptionTier: tier,
+          subscriptionActivated: true
+        }, { merge: true });
+        console.log(`Updated referral ${userId} subscription status to ${tier} under tenant ${tenantUid}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error updating referral subscription status:', err);
   }
 }

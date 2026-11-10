@@ -27,6 +27,7 @@ import {
   Loader2,
   ArrowLeft,
   LogOut,
+  Crown,
 } from 'lucide-react';
 import { 
   LocationPoint, 
@@ -670,6 +671,25 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
                               <Clock className="w-3 h-3 text-slate-400" />
                               <span>Joined via link {referral.joinedDate}</span>
+                            </div>
+
+                            {/* Subscription Status Tag */}
+                            <div className="pt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {referral.subscriptionActivated || (referral.subscriptionTier && referral.subscriptionTier !== 'none') ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                                  <Crown className="w-3 h-3 text-emerald-600" />
+                                  <span>
+                                    {referral.subscriptionTier === 'pro'
+                                      ? 'Pro Plan Active (R399/mo)'
+                                      : 'Basic Plan Active (R149/mo)'}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                                  <Crown className="w-3 h-3 text-amber-600" />
+                                  <span>Subscription Pending Activation</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

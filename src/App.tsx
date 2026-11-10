@@ -59,7 +59,7 @@ import {
   Link2,
 } from 'lucide-react';
 import { AdminDashboard } from './components/AdminDashboard';
-import { registerReferralToTenant } from './utils/referral';
+import { registerReferralToTenant, updateReferralSubscriptionStatus } from './utils/referral';
 
 export default function App() {
   const { user, loading, userProfile, referrals, gigs, savedLocations } = useFirebase();
@@ -364,7 +364,8 @@ export default function App() {
           refToUse,
           userProfile?.name,
           userProfile?.surname,
-          userProfile?.phone
+          userProfile?.phone,
+          userProfile?.subscriptionTier || 'none'
         );
       }
       setShowOnboarding(false);
@@ -380,6 +381,10 @@ export default function App() {
       await updateDoc(doc(db, 'users', user.uid), {
         subscriptionTier: tier,
       });
+
+      // Update tenant referral record with activated subscription tier
+      await updateReferralSubscriptionStatus(user.uid, tier);
+
       setShowSubscription(false);
       // After sub, show onboarding if not done
       if (!userProfile?.hasCompletedOnboarding) {

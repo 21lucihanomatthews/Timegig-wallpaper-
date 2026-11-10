@@ -35,13 +35,15 @@ service cloud.firestore {
 
     function isValidReferral(data) {
       return data.keys().hasAll(['id', 'name', 'email', 'status'])
-        && data.keys().hasOnly(['id', 'name', 'email', 'phone', 'unit', 'status', 'previousStatus', 'joinedDate', 'selfieUrl', 'documents', 'referralCode'])
+        && data.keys().hasOnly(['id', 'name', 'email', 'phone', 'unit', 'status', 'previousStatus', 'joinedDate', 'selfieUrl', 'documents', 'referralCode', 'subscriptionTier', 'subscriptionActivated'])
         && data.id is string && data.id.size() <= 128
         && data.name is string && data.name.size() <= 100
         && data.email is string && data.email.size() <= 255
         && data.status in ['pending', 'approved', 'rejected', 'frozen']
         && (data.unit == null || (data.unit is string && data.unit.size() <= 100))
-        && (data.previousStatus == null || data.previousStatus in ['pending', 'approved', 'rejected']);
+        && (data.previousStatus == null || data.previousStatus in ['pending', 'approved', 'rejected'])
+        && (data.subscriptionTier == null || data.subscriptionTier in ['none', 'basic', 'pro'])
+        && (data.subscriptionActivated == null || data.subscriptionActivated is bool);
     }
 
     function isValidDoc(data) {
@@ -85,7 +87,7 @@ service cloud.firestore {
         allow list: if isOwner(userId);
         allow get: if isOwner(userId) && isValidId(referralId);
         allow create: if (isOwner(userId) || (isSignedIn() && request.auth.uid == referralId)) && isValidReferral(incoming()) && isValidId(referralId);
-        allow update: if isOwner(userId) && isValidReferral(incoming()) && isValidId(referralId);
+        allow update: if (isOwner(userId) || (isSignedIn() && request.auth.uid == referralId)) && isValidReferral(incoming()) && isValidId(referralId);
         allow delete: if isOwner(userId) && isValidId(referralId);
 
         match /documents/{docId} {

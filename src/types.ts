@@ -55,6 +55,8 @@ export interface TenantReferral {
   referralCode: string;
   status: 'pending' | 'approved' | 'rejected' | 'frozen';
   previousStatus?: 'pending' | 'approved' | 'rejected';
+  subscriptionTier?: 'none' | 'basic' | 'pro';
+  subscriptionActivated?: boolean;
   selfieUrl: string;
   documents: TenantReferralDocument[];
 }

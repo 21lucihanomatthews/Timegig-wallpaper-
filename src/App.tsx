@@ -491,18 +491,22 @@ export default function App() {
       )}
 
       {!user ? (
-        <div className="w-full h-full relative bg-slate-950 overflow-hidden flex items-center justify-center p-6">
-          {/* Cinematic Blurred Map Background */}
-          <div className="absolute inset-0 z-0 blur-md grayscale brightness-[0.2] opacity-40">
-             <MapComponent
+        <div className="w-full h-full relative bg-slate-950 overflow-hidden flex items-center justify-center p-4 sm:p-6">
+          {/* Map Wallpaper Background */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <MapComponent
               center={center}
               zoom={zoom}
-              userLocation={null}
+              userLocation={userLocation}
               selectedLocation={null}
               savedLocations={[]}
               onMarkerClick={() => {}}
               onRecenter={() => {}}
+              hideControls={true}
             />
+            {/* Elegant wallpaper tint & vignette for contrast and readability */}
+            <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1.5px] pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-slate-950/60 pointer-events-none" />
           </div>
 
           <div className={`relative z-10 w-full max-w-md space-y-6 transition-all duration-700 ${showSplash ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
@@ -856,7 +860,7 @@ export default function App() {
 
           {/* SUBSCRIPTION SELECTION MODAL (Mandatory after Signup) */}
           {showSubscription && (
-            <div className="fixed inset-0 z-[10000] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-500 overflow-y-auto">
+            <div className="fixed inset-0 z-[10000] bg-slate-950/65 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-500 overflow-y-auto">
               <div className="w-full max-w-2xl space-y-6 animate-in slide-in-from-bottom-10 duration-700 py-8">
                 <div className="text-center space-y-2">
                   <div className="inline-flex p-3 bg-blue-600/20 rounded-2xl text-blue-400 border border-blue-500/20">
@@ -1190,7 +1194,7 @@ export default function App() {
 
           {/* VERIFICATION FLOW MODAL (Mandatory after Subscription) */}
           {userProfile && userProfile.subscriptionTier !== 'none' && userProfile.verificationStatus !== 'approved' && showReviewModal && (
-            <div className="fixed inset-0 z-[10000] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-500 overflow-y-auto">
+            <div className="fixed inset-0 z-[10000] bg-slate-950/65 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-500 overflow-y-auto">
               {userProfile.verificationStatus === 'pending' ? (
                 <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl border border-blue-100 animate-in zoom-in-95 duration-500">
                   <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 flex items-center justify-center mb-4">

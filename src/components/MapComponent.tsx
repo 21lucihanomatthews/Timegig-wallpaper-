@@ -12,6 +12,7 @@ interface MapComponentProps {
   onMarkerClick: (location: LocationPoint) => void;
   onRecenter: () => void;
   activeGig?: ActiveGig | null;
+  hideControls?: boolean;
 }
 
 const TILE_URLS: Record<MapTileStyle, { url: string; attribution: string }> = {
@@ -46,6 +47,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   onMarkerClick,
   onRecenter,
   activeGig,
+  hideControls = false,
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -321,40 +323,42 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Floating Zoom, Recenter, & Satellite Bubbles at Bottom-Right */}
-      <div className="absolute bottom-24 right-6 z-[999] flex flex-col gap-3.5 pointer-events-auto">
-        <button
-          onClick={onRecenter}
-          className="w-14 h-14 rounded-full bg-white shadow-2xl border-2 border-slate-200 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:scale-105 transition-all active:scale-95 cursor-pointer"
-          title="Back to Location"
-        >
-          <Crosshair className="w-6 h-6 stroke-[2.5]" />
-        </button>
-        <button
-          onClick={handleZoomIn}
-          className="w-14 h-14 rounded-full bg-white shadow-2xl border-2 border-slate-200 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:scale-105 transition-all active:scale-95 cursor-pointer"
-          title="Zoom In"
-        >
-          <Plus className="w-6 h-6 stroke-[2.5]" />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          className="w-14 h-14 rounded-full bg-white shadow-2xl border-2 border-slate-200 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:scale-105 transition-all active:scale-95 cursor-pointer"
-          title="Zoom Out"
-        >
-          <Minus className="w-6 h-6 stroke-[2.5]" />
-        </button>
-        <button
-          onClick={handleToggleSatellite}
-          className={`w-14 h-14 rounded-full shadow-2xl border-2 flex items-center justify-center transition-all active:scale-95 cursor-pointer hover:scale-105 ${
-            mapStyle === 'satellite'
-              ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/40'
-              : 'bg-white text-slate-800 border-slate-200 hover:text-blue-600'
-          }`}
-          title="Toggle Satellite View"
-        >
-          <Globe className="w-6 h-6 stroke-[2.5]" />
-        </button>
-      </div>
+      {!hideControls && (
+        <div className="absolute bottom-24 right-6 z-[999] flex flex-col gap-3.5 pointer-events-auto">
+          <button
+            onClick={onRecenter}
+            className="w-14 h-14 rounded-full bg-white shadow-2xl border-2 border-slate-200 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:scale-105 transition-all active:scale-95 cursor-pointer"
+            title="Back to Location"
+          >
+            <Crosshair className="w-6 h-6 stroke-[2.5]" />
+          </button>
+          <button
+            onClick={handleZoomIn}
+            className="w-14 h-14 rounded-full bg-white shadow-2xl border-2 border-slate-200 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:scale-105 transition-all active:scale-95 cursor-pointer"
+            title="Zoom In"
+          >
+            <Plus className="w-6 h-6 stroke-[2.5]" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="w-14 h-14 rounded-full bg-white shadow-2xl border-2 border-slate-200 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:scale-105 transition-all active:scale-95 cursor-pointer"
+            title="Zoom Out"
+          >
+            <Minus className="w-6 h-6 stroke-[2.5]" />
+          </button>
+          <button
+            onClick={handleToggleSatellite}
+            className={`w-14 h-14 rounded-full shadow-2xl border-2 flex items-center justify-center transition-all active:scale-95 cursor-pointer hover:scale-105 ${
+              mapStyle === 'satellite'
+                ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/40'
+                : 'bg-white text-slate-800 border-slate-200 hover:text-blue-600'
+            }`}
+            title="Toggle Satellite View"
+          >
+            <Globe className="w-6 h-6 stroke-[2.5]" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

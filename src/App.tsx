@@ -638,7 +638,7 @@ export default function App() {
                 disabled={isAuthLoading}
                 className="w-full flex items-center justify-center gap-3 bg-slate-950/50 hover:bg-slate-950 border border-slate-800 text-white font-bold py-3.5 px-6 rounded-2xl transition-all active:scale-[0.98] cursor-pointer"
               >
-                <img src="https://www.gstatic.com/firebase/anonymous/google.png" className="w-4 h-4" />
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" />
                 <span className="text-xs">Google Login</span>
               </button>
             </div>

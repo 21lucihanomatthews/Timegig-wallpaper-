@@ -3,9 +3,22 @@ import { LocationPoint, ActiveGig, ServiceHiringSeeker } from './types';
 import { MapComponent } from './components/MapComponent';
 import { BottomMenuBar } from './components/BottomMenuBar';
 import { FeatureModal } from './components/FeatureModal';
+import { LocationSidebar } from './components/LocationSidebar';
+import { SavedLocationsModal } from './components/SavedLocationsModal';
 import { PRESET_CITIES } from './data/presetCities';
 import { INITIAL_HIRING_SEEKERS } from './data/seekersAndReferrals';
 import { fetchRoadRoute } from './utils/navigationRoute';
+import { useFirebase } from './contexts/FirebaseContext';
+import { signInWithGoogle, logout, db, handleFirestoreError, OperationType } from './firebase';
+import { 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  addDoc, 
+  serverTimestamp,
+  deleteDoc
+} from 'firebase/firestore';
 import {
   Search,
   X,
@@ -18,9 +31,13 @@ import {
   UserCheck,
   ShieldCheck,
   ChevronUp,
+  LogIn,
+  LogOut,
+  Map as MapIcon,
 } from 'lucide-react';
 
 export default function App() {
+  const { user, loading, userProfile, referrals, gigs, savedLocations } = useFirebase();
   const [center, setCenter] = useState<[number, number]>([-33.9249, 18.4241]); // Default hub Cape Town
   const [zoom, setZoom] = useState<number>(13);
   const [userLocation, setUserLocation] = useState<LocationPoint | null>(null);
@@ -41,8 +58,8 @@ export default function App() {
   // Seekers State (Live ratings and reviews updated upon gig completion)
   const [seekersList, setSeekersList] = useState<ServiceHiringSeeker[]>(INITIAL_HIRING_SEEKERS);
 
-  // Active GiG State & Road Navigation
-  const [activeGig, setActiveGig] = useState<ActiveGig | null>(null);
+  // Active GiG State (Derived from Firestore)
+  const activeGig = gigs.find(g => g.status === 'in_progress' || g.status === 'waiting_acceptance') || null;
   const [isGigBarMinimized, setIsGigBarMinimized] = useState(false);
 
   // GiG Cancellation Modal State
@@ -58,16 +75,22 @@ export default function App() {
   const [ratingHover, setRatingHover] = useState<number | null>(null);
   const [reviewComment, setReviewComment] = useState('');
 
-  // Saved locations in localStorage
-  const [savedLocations] = useState<LocationPoint[]>(() => {
+  const [isBookmarksOpen, setIsBookmarksOpen] = useState(false);
+
+  const handleToggleSave = async (loc: LocationPoint) => {
+    if (!user) return;
+    const isSaved = savedLocations.some((s) => s.id === loc.id);
+    const locDocRef = doc(db, 'users', user.uid, 'locations', loc.id);
     try {
-      const stored = localStorage.getItem('geopulse_saved_locations');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // ignore
+      if (isSaved) {
+        await deleteDoc(locDocRef);
+      } else {
+        await setDoc(locDocRef, { ...loc, savedAt: new Date().toISOString() });
+      }
+    } catch (error) {
+      handleFirestoreError(error, isSaved ? OperationType.DELETE : OperationType.WRITE, `users/${user.uid}/locations/${loc.id}`);
     }
-    return [];
-  });
+  };
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -182,6 +205,8 @@ export default function App() {
 
   // START GIG & ROAD NAVIGATION: Called when seeker accepts booking
   const handleStartGig = async (seeker: ServiceHiringSeeker, hours: number) => {
+    if (!user) return;
+
     const destination: [number, number] = userLocation
       ? [userLocation.lat, userLocation.lng]
       : [-33.9249, 18.4241];
@@ -195,8 +220,9 @@ export default function App() {
     // Calculate real driving road navigation
     const { routePoints, distanceKm, etaMinutes } = await fetchRoadRoute(seekerStart, destination);
 
-    const newGig: ActiveGig = {
-      id: `gig-${Date.now()}`,
+    const gigId = `gig-${Date.now()}`;
+    const newGigData = {
+      id: gigId,
       seekerId: seeker.id,
       seekerName: seeker.name,
       seekerService: seeker.service,
@@ -211,70 +237,117 @@ export default function App() {
       distanceKm,
       totalCost: seeker.ratePerHour * hours,
       hours,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    setActiveGig(newGig);
-    setActiveTab('gigs');
-    setGigNotice(`Gig initiated! ${seeker.name} accepted. Road navigation active on map.`);
-    setTimeout(() => setGigNotice(null), 4500);
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'gigs', gigId), newGigData);
+      setActiveTab('gigs');
+      setGigNotice(`Gig initiated! ${seeker.name} accepted. Road navigation active on map.`);
+      setTimeout(() => setGigNotice(null), 4500);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/gigs/${gigId}`);
+    }
   };
 
   // CANCEL GIG: Both Seeker and User can cancel, but must give reason to each other
-  const handleConfirmCancelGig = () => {
+  const handleConfirmCancelGig = async () => {
+    if (!user || !activeGig) return;
+
     const finalReason = cancelDetailText.trim()
       ? `${cancelReason}: ${cancelDetailText.trim()}`
       : cancelReason;
 
-    setGigNotice(
-      `GiG Cancelled by ${cancelRole === 'user' ? 'User (Client)' : 'Seeker (Provider)'}. Mutual Reason: "${finalReason}"`
-    );
-    setIsCancellingGig(false);
-    setActiveGig(null);
-    setCancelDetailText('');
-    setTimeout(() => setGigNotice(null), 6000);
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'gigs', activeGig.id), {
+        status: 'cancelled',
+        cancelledBy: cancelRole,
+        cancellationReason: finalReason,
+        updatedAt: new Date().toISOString(),
+      });
+
+      setGigNotice(
+        `GiG Cancelled by ${cancelRole === 'user' ? 'User (Client)' : 'Seeker (Provider)'}. Mutual Reason: "${finalReason}"`
+      );
+      setIsCancellingGig(false);
+      setCancelDetailText('');
+      setTimeout(() => setGigNotice(null), 6000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/gigs/${activeGig.id}`);
+    }
   };
 
   // COMPLETE GIG: Only User can click on gig completed and submit star rating for seeker profile
-  const handleConfirmCompleteGig = () => {
-    if (!activeGig) return;
+  const handleConfirmCompleteGig = async () => {
+    if (!user || !activeGig) return;
 
-    const currentSeeker = seekersList.find((s) => s.id === activeGig.seekerId);
-    if (currentSeeker) {
-      const newReviewsCount = currentSeeker.reviewsCount + 1;
-      const newRating = +(
-        (currentSeeker.rating * currentSeeker.reviewsCount + ratingStars) /
-        newReviewsCount
-      ).toFixed(1);
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'gigs', activeGig.id), {
+        status: 'completed',
+        ratingGiven: ratingStars,
+        reviewGiven: reviewComment.trim() || 'Gig completed successfully.',
+        updatedAt: new Date().toISOString(),
+      });
 
-      const newReview = {
-        id: `rev-${Date.now()}`,
-        author: 'Luciana Matthews (You)',
-        rating: ratingStars,
-        comment: reviewComment.trim() || 'Gig completed successfully with outstanding satisfaction.',
-        date: 'Just now',
-      };
-
-      setSeekersList((prev) =>
-        prev.map((s) =>
-          s.id === activeGig.seekerId
-            ? {
-                ...s,
-                rating: newRating,
-                reviewsCount: newReviewsCount,
-                reviews: [newReview, ...(s.reviews || [])],
-              }
-            : s
-        )
+      setGigNotice(
+        `GiG Completed! You awarded ${ratingStars} ★ to ${activeGig.seekerName}. Rating is now updated on their profile.`
       );
+      setIsCompletingGig(false);
+      setTimeout(() => setGigNotice(null), 6000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/gigs/${activeGig.id}`);
     }
-
-    setGigNotice(
-      `GiG Completed! You awarded ${ratingStars} ★ to ${activeGig.seekerName}. Rating is now updated on their profile.`
-    );
-    setIsCompletingGig(false);
-    setActiveGig(null);
-    setTimeout(() => setGigNotice(null), 6000);
   };
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-slate-900 gap-4">
+        <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+        <div className="text-white/60 text-sm font-medium animate-pulse">Initializing GeoPulse...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="w-screen h-screen relative bg-slate-900 overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full animate-pulse delay-700" />
+        </div>
+
+        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center px-6">
+          <div className="w-full max-w-sm space-y-8 text-center">
+            <div className="space-y-3">
+              <div className="inline-flex p-4 bg-blue-600/10 rounded-3xl border border-blue-500/20 mb-2">
+                <MapIcon className="w-12 h-12 text-blue-500" />
+              </div>
+              <h1 className="text-4xl font-black text-white tracking-tight">GeoPulse</h1>
+              <p className="text-slate-400 text-sm leading-relaxed max-w-[280px] mx-auto">
+                Real-time world map for tenant management, gig services, and seamless navigation.
+              </p>
+            </div>
+
+            <button
+              onClick={signInWithGoogle}
+              className="w-full group flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-900 font-bold py-4 px-6 rounded-2xl transition-all shadow-xl shadow-blue-500/10 active:scale-[0.98] cursor-pointer"
+            >
+              <LogIn className="w-5 h-5 text-blue-600 group-hover:rotate-12 transition-transform" />
+              <span>Continue with Google Login</span>
+            </button>
+
+            <div className="pt-4 border-t border-slate-800/50">
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                Secure access powered by Firebase
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const showTopSearchBar =
     (activeTab === 'gigs' || activeTab === 'referrals' || activeTab === 'seekers') &&
@@ -345,8 +418,11 @@ export default function App() {
               <div className="flex items-center gap-2 pt-0.5">
                 <button
                   type="button"
-                  onClick={() => setIsCancellingGig(true)}
-                  className="flex-1 py-2 px-2 bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl text-[10px] font-bold transition-all border border-slate-100 flex items-center justify-center gap-1.5"
+                  onClick={() => {
+                    setCancelRole('user');
+                    setIsCancellingGig(true);
+                  }}
+                  className="flex-1 py-2 px-2 bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl text-[10px] font-bold transition-all border border-slate-100 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <AlertTriangle className="w-3 h-3" />
                   <span>Cancel</span>
@@ -354,7 +430,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsCompletingGig(true)}
-                  className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3 h-3" />
                   <span>Complete</span>
@@ -426,6 +502,20 @@ export default function App() {
             )}
           </div>
 
+          {/* Bookmarks toggle button next to search */}
+          <button
+            onClick={() => setIsBookmarksOpen(true)}
+            className="absolute -right-14 top-0 w-12 h-12 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/90 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+            title="Saved Pins"
+          >
+            <MapPin className="w-5 h-5" />
+            {savedLocations.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                {savedLocations.length}
+              </span>
+            )}
+          </button>
+
           {/* Search Results Dropdown (for map geocoding in gigs) */}
           {activeTab === 'gigs' && showDropdown && searchResults.length > 0 && (
             <div className="absolute left-0 right-0 top-14 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 space-y-1 z-60 max-h-80 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
@@ -458,6 +548,36 @@ export default function App() {
         searchQuery={searchQuery}
         seekersList={seekersList}
         onStartGig={handleStartGig}
+        referrals={referrals}
+        userProfile={userProfile}
+        onLogout={logout}
+      />
+
+      {/* Location Detail Sidebar */}
+      {selectedLocation && (
+        <LocationSidebar
+          location={selectedLocation}
+          userLocation={userLocation}
+          isSaved={savedLocations.some((s) => s.id === selectedLocation.id)}
+          onToggleSave={handleToggleSave}
+          onClose={() => setSelectedLocation(null)}
+        />
+      )}
+
+      {/* Saved Locations Bookmarks Modal */}
+      <SavedLocationsModal
+        isOpen={isBookmarksOpen}
+        onClose={() => setIsBookmarksOpen(false)}
+        savedLocations={savedLocations}
+        onSelectLocation={handleSelectLocation}
+        onRemoveLocation={async (id) => {
+          if (!user) return;
+          try {
+            await deleteDoc(doc(db, 'users', user.uid, 'locations', id));
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/locations/${id}`);
+          }
+        }}
       />
 
       {/* GIG CANCELLATION MODAL: Seeker or User must give reason to each other */}
@@ -485,7 +605,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsCancellingGig(false)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl"
+                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl cursor-pointer"
               >
                 Back
               </button>
@@ -597,7 +717,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsCompletingGig(false)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl"
+                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>

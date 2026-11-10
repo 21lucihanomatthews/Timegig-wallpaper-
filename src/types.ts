@@ -1,3 +1,15 @@
+export interface UserProfile {
+  uid: string;
+  name: string;
+  surname: string;
+  email: string;
+  phone: string;
+  totalProfit: number;
+  tenantSubProfit: number;
+  userSubProfit: number;
+  referralCode: string;
+}
+
 export interface LocationPoint {
   id: string;
   name: string;
@@ -88,4 +100,6 @@ export interface ActiveGig {
   cancellationReason?: string;
   ratingGiven?: number;
   reviewGiven?: string;
+  createdAt: string;
+  updatedAt: string;
 }

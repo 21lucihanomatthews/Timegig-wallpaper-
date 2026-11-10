@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email'])
+        && data.keys().hasOnly(['uid', 'name', 'surname', 'email', 'phone', 'totalProfit', 'tenantSubProfit', 'userSubProfit', 'referralCode'])
+        && data.uid == request.auth.uid
+        && data.email is string && data.email.size() <= 255
+        && (data.name == null || (data.name is string && data.name.size() <= 100))
+        && (data.surname == null || (data.surname is string && data.surname.size() <= 100))
+        && (data.phone == null || (data.phone is string && data.phone.size() <= 20))
+        && (data.totalProfit == null || data.totalProfit is number)
+        && (data.tenantSubProfit == null || data.tenantSubProfit is number)
+        && (data.userSubProfit == null || data.userSubProfit is number)
+        && (data.referralCode == null || (data.referralCode is string && data.referralCode.size() <= 50));
+    }
+
+    function isValidReferral(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'status'])
+        && data.keys().hasOnly(['id', 'name', 'email', 'phone', 'unit', 'status', 'previousStatus', 'joinedDate', 'selfieUrl'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 255
+        && data.status in ['pending', 'approved', 'rejected', 'frozen']
+        && (data.unit == null || (data.unit is string && data.unit.size() <= 100))
+        && (data.previousStatus == null || data.previousStatus in ['pending', 'approved', 'rejected']);
+    }
+
+    function isValidDoc(data) {
+      return data.keys().hasAll(['id', 'name', 'type', 'content'])
+        && data.keys().hasOnly(['id', 'name', 'type', 'size', 'date', 'content'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 255
+        && data.type in ['lease', 'id', 'income', 'utility', 'contract']
+        && data.content is string && data.content.size() <= 1048576; // 1MB limit
+    }
+
+    function isValidGig(data) {
+      return data.keys().hasAll(['id', 'seekerId', 'status'])
+        && data.keys().hasOnly(['id', 'seekerId', 'seekerName', 'seekerService', 'seekerRate', 'seekerSelfieUrl', 'status', 'totalCost', 'hours', 'distanceKm', 'etaMinutes', 'ratingGiven', 'reviewGiven', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() <= 128
+        && data.status in ['waiting_acceptance', 'in_progress', 'completed', 'cancelled'];
+    }
+
+    function isValidLocation(data) {
+      return data.keys().hasAll(['id', 'name', 'lat', 'lng'])
+        && data.keys().hasOnly(['id', 'name', 'country', 'lat', 'lng', 'description', 'category', 'savedAt'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.lat is number && data.lng is number;
+    }
+
+    // --- Path Matches ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isVerified() && isValidUser(incoming());
+      allow update: if isOwner(userId) && isVerified() && isValidUser(incoming());
+      // Prevent deletion of user profiles to maintain billing/history
+      allow delete: if false;
+
+      match /referrals/{referralId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(referralId);
+        allow create: if isOwner(userId) && isVerified() && isValidReferral(incoming()) && isValidId(referralId);
+        allow update: if isOwner(userId) && isVerified() && isValidReferral(incoming()) && isValidId(referralId);
+        allow delete: if isOwner(userId) && isVerified() && isValidId(referralId);
+
+        match /documents/{docId} {
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId) && isValidId(docId);
+          allow create: if isOwner(userId) && isVerified() && isValidDoc(incoming()) && isValidId(docId);
+          allow update: if isOwner(userId) && isVerified() && isValidDoc(incoming()) && isValidId(docId);
+          allow delete: if isOwner(userId) && isVerified() && isValidId(docId);
+        }
+      }
+
+      match /gigs/{gigId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(gigId);
+        allow create: if isOwner(userId) && isVerified() && isValidGig(incoming()) && isValidId(gigId);
+        allow update: if isOwner(userId) && isVerified() && isValidGig(incoming()) && isValidId(gigId);
+        allow delete: if false; // Audit trail
+      }
+
+      match /locations/{locationId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(locationId);
+        allow create: if isOwner(userId) && isVerified() && isValidLocation(incoming()) && isValidId(locationId);
+        allow update: if isOwner(userId) && isVerified() && isValidLocation(incoming()) && isValidId(locationId);
+        allow delete: if isOwner(userId) && isVerified() && isValidId(locationId);
+      }
+    }
+  }
+}

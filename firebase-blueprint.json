@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "The profile data for a GeoPulse user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 100 },
+        "surname": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string", "maxLength": 20 },
+        "totalProfit": { "type": "number" },
+        "tenantSubProfit": { "type": "number" },
+        "userSubProfit": { "type": "number" },
+        "referralCode": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "email"]
+    },
+    "TenantReferral": {
+      "title": "Tenant Referral",
+      "description": "A referral application linked to a tenant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string", "maxLength": 20 },
+        "unit": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "frozen"] },
+        "previousStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "joinedDate": { "type": "string" },
+        "selfieUrl": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "status"]
+    },
+    "ReferralDocument": {
+      "title": "Referral Document",
+      "description": "A document uploaded by a referral.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 255 },
+        "type": { "type": "string", "enum": ["lease", "id", "income", "utility", "contract"] },
+        "size": { "type": "string", "maxLength": 20 },
+        "date": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "content"]
+    },
+    "Gig": {
+      "title": "Gig Record",
+      "description": "An active or completed gig navigation and billing record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "seekerId": { "type": "string" },
+        "seekerName": { "type": "string" },
+        "seekerService": { "type": "string" },
+        "seekerRate": { "type": "number" },
+        "seekerSelfieUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting_acceptance", "in_progress", "completed", "cancelled"] },
+        "totalCost": { "type": "number" },
+        "hours": { "type": "number" },
+        "distanceKm": { "type": "number" },
+        "etaMinutes": { "type": "number" },
+        "ratingGiven": { "type": "number" },
+        "reviewGiven": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "seekerId", "status"]
+    },
+    "SavedLocation": {
+      "title": "Saved Location",
+      "description": "A bookmarked map location.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 100 },
+        "country": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "savedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "lat", "lng"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Root user profile document."
+    },
+    "/users/{userId}/referrals/{referralId}": {
+      "schema": "TenantReferral",
+      "description": "Referrals associated with the tenant."
+    },
+    "/users/{userId}/referrals/{referralId}/documents/{docId}": {
+      "schema": "ReferralDocument",
+      "description": "Documents for a specific referral."
+    },
+    "/users/{userId}/gigs/{gigId}": {
+      "schema": "Gig",
+      "description": "Gig history for the user."
+    },
+    "/users/{userId}/locations/{locationId}": {
+      "schema": "SavedLocation",
+      "description": "User saved map bookmarks."
+    }
+  }
+}

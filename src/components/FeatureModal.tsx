@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   ShieldCheck,
@@ -26,9 +26,18 @@ import {
   MessageSquare,
   Loader2,
   ArrowLeft,
+  LogOut,
 } from 'lucide-react';
-import { LocationPoint, TenantReferral, TenantReferralDocument, ServiceHiringSeeker } from '../types';
-import { SEEKERS_STORIES, INITIAL_TENANT_REFERRALS } from '../data/seekersAndReferrals';
+import { 
+  LocationPoint, 
+  TenantReferral, 
+  TenantReferralDocument, 
+  ServiceHiringSeeker, 
+  UserProfile 
+} from '../types';
+import { SEEKERS_STORIES } from '../data/seekersAndReferrals';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface FeatureModalProps {
   activeTab: string | null;
@@ -37,6 +46,9 @@ interface FeatureModalProps {
   searchQuery?: string;
   seekersList: ServiceHiringSeeker[];
   onStartGig: (seeker: ServiceHiringSeeker, hours: number) => void;
+  referrals: TenantReferral[];
+  userProfile: UserProfile | null;
+  onLogout: () => void;
 }
 
 export const FeatureModal: React.FC<FeatureModalProps> = ({
@@ -45,22 +57,33 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
   searchQuery = '',
   seekersList,
   onStartGig,
+  referrals,
+  userProfile,
+  onLogout,
 }) => {
   if (!activeTab || activeTab === 'gigs') return null;
 
   // Profile Form State
-  const [name, setName] = useState('');
-  const [surname, setSurname] = useState('');
-  const [email, setEmail] = useState('');
-  const [contact, setContact] = useState('');
+  const [name, setName] = useState(userProfile?.name || '');
+  const [surname, setSurname] = useState(userProfile?.surname || '');
+  const [email, setEmail] = useState(userProfile?.email || '');
+  const [contact, setContact] = useState(userProfile?.phone || '');
   const [savedProfile, setSavedProfile] = useState(false);
+
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name);
+      setSurname(userProfile.surname);
+      setEmail(userProfile.email);
+      setContact(userProfile.phone);
+    }
+  }, [userProfile]);
 
   // Tenant Link State
   const [copiedLink, setCopiedLink] = useState(false);
-  const tenantReferralLink = 'https://geopulse.app/tenant/join?ref=LUCIANA-TENANT-892';
+  const tenantReferralLink = `https://geopulse.app/tenant/join?ref=${userProfile?.referralCode || 'GEO-XXXXXX'}`;
 
-  // Referrals State (Only referrals who joined through tenant link)
-  const [tenantReferrals, setTenantReferrals] = useState<TenantReferral[]>(INITIAL_TENANT_REFERRALS);
+  // Referrals State (Now passed from props, synced with Firestore)
   const [selectedDocPreview, setSelectedDocPreview] = useState<{
     doc: TenantReferralDocument;
     referralName: string;
@@ -102,57 +125,76 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
     }
   };
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userProfile) return;
     if (!name || !surname || !email || !contact) {
       alert('Please fill in all required fields.');
       return;
     }
-    setSavedProfile(true);
-    setTimeout(() => setSavedProfile(false), 3000);
+    
+    try {
+      await updateDoc(doc(db, 'users', userProfile.uid), {
+        name,
+        surname,
+        email,
+        phone: contact,
+      });
+      setSavedProfile(true);
+      setTimeout(() => setSavedProfile(false), 3000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userProfile.uid}`);
+    }
   };
 
   // Referrals Actions: Approve, Reject, Freeze / Unfreeze
-  const handleApproveReferral = (id: string, refName: string) => {
-    setTenantReferrals((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'approved' } : r))
-    );
-    setReferralActionNotice(`Approved referral application for ${refName}.`);
-    setTimeout(() => setReferralActionNotice(null), 3000);
+  const handleApproveReferral = async (id: string, refName: string) => {
+    if (!userProfile) return;
+    try {
+      await updateDoc(doc(db, 'users', userProfile.uid, 'referrals', id), {
+        status: 'approved',
+      });
+      setReferralActionNotice(`Approved referral application for ${refName}.`);
+      setTimeout(() => setReferralActionNotice(null), 3000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userProfile.uid}/referrals/${id}`);
+    }
   };
 
-  const handleRejectReferral = (id: string, refName: string) => {
-    setTenantReferrals((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'rejected' } : r))
-    );
-    setReferralActionNotice(`Rejected referral application for ${refName}.`);
-    setTimeout(() => setReferralActionNotice(null), 3000);
+  const handleRejectReferral = async (id: string, refName: string) => {
+    if (!userProfile) return;
+    try {
+      await updateDoc(doc(db, 'users', userProfile.uid, 'referrals', id), {
+        status: 'rejected',
+      });
+      setReferralActionNotice(`Rejected referral application for ${refName}.`);
+      setTimeout(() => setReferralActionNotice(null), 3000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userProfile.uid}/referrals/${id}`);
+    }
   };
 
-  const handleToggleFreezeReferral = (id: string, refName: string) => {
-    setTenantReferrals((prev) =>
-      prev.map((r) => {
-        if (r.id === id) {
-          const isCurrentlyFrozen = r.status === 'frozen';
-          const newStatus = isCurrentlyFrozen ? r.previousStatus || 'approved' : 'frozen';
-          const prevStatus = !isCurrentlyFrozen && r.status !== 'frozen' ? r.status : undefined;
-          return {
-            ...r,
-            status: newStatus,
-            previousStatus: prevStatus,
-          };
-        }
-        return r;
-      })
-    );
-    const referral = tenantReferrals.find((r) => r.id === id);
-    const wasFrozen = referral?.status === 'frozen';
-    setReferralActionNotice(
-      wasFrozen
-        ? `Unfroze account for ${refName}. Status restored.`
-        : `Account for ${refName} is now FROZEN. Commissions suspended.`
-    );
-    setTimeout(() => setReferralActionNotice(null), 3500);
+  const handleToggleFreezeReferral = async (referral: TenantReferral) => {
+    if (!userProfile) return;
+    try {
+      const isCurrentlyFrozen = referral.status === 'frozen';
+      const newStatus = isCurrentlyFrozen ? referral.previousStatus || 'approved' : 'frozen';
+      const prevStatus = !isCurrentlyFrozen && referral.status !== 'frozen' ? referral.status : referral.previousStatus;
+      
+      await updateDoc(doc(db, 'users', userProfile.uid, 'referrals', referral.id), {
+        status: newStatus,
+        previousStatus: prevStatus,
+      });
+
+      setReferralActionNotice(
+        isCurrentlyFrozen
+          ? `Unfroze account for ${referral.name}. Status restored.`
+          : `Account for ${referral.name} is now FROZEN. Commissions suspended.`
+      );
+      setTimeout(() => setReferralActionNotice(null), 3500);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userProfile.uid}/referrals/${referral.id}`);
+    }
   };
 
   // Document Download Trigger
@@ -223,7 +265,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                 Total Profit Balance
               </div>
               <div className="text-5xl sm:text-6xl font-extrabold tracking-tight font-mono tabular-nums text-white my-3">
-                R0.00
+                R{userProfile?.totalProfit.toFixed(2) || '0.00'}
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
                 <TrendingUp className="w-4 h-4 text-slate-400" />
@@ -239,7 +281,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                   <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Tier 1</span>
                 </div>
                 <div className="text-3xl font-bold font-mono tabular-nums text-slate-900">
-                  R0.00
+                  R{userProfile?.tenantSubProfit.toFixed(2) || '0.00'}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
                   From active leases & unit dividends
@@ -252,7 +294,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                   <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">Network</span>
                 </div>
                 <div className="text-3xl font-bold font-mono tabular-nums text-slate-900">
-                  R0.00
+                  R{userProfile?.userSubProfit.toFixed(2) || '0.00'}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
                   From referral network overrides
@@ -342,6 +384,13 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                 <h3 className="text-lg font-bold text-slate-900">User Profile & Account Dashboard</h3>
                 <p className="text-xs text-slate-500">Manage your required credentials and contact info</p>
               </div>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
             </div>
 
             {/* Big Profile Logo & Identity Card */}
@@ -454,15 +503,14 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
   }
 
   // 3. REFERRALS VIEW: Show ONLY Referrals who joined through Tenant Link
-  const filteredReferrals = tenantReferrals.filter((r) => {
+  const filteredReferrals = referrals.filter((r) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
       r.name.toLowerCase().includes(q) ||
       r.email.toLowerCase().includes(q) ||
       r.unit.toLowerCase().includes(q) ||
-      r.status.toLowerCase().includes(q) ||
-      r.documents.some((d) => d.name.toLowerCase().includes(q))
+      r.status.toLowerCase().includes(q)
     );
   });
 
@@ -498,7 +546,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                     <div>
                       <h3 className="text-base font-bold text-slate-900">Tenant Referral Applications</h3>
                       <p className="text-xs text-slate-500">
-                        Showing only referrals joined via link: <span className="font-mono font-semibold text-blue-600">LUCIANA-TENANT-892</span>
+                        Showing only referrals joined via link: <span className="font-mono font-semibold text-blue-600">{userProfile?.referralCode || 'GEO-XXXXXX'}</span>
                       </p>
                     </div>
                   </div>
@@ -605,12 +653,12 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                       {/* Attached Documents Section (Clickable full screen and downloadable) */}
                       <div className="pt-2 border-t border-slate-100 space-y-2">
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                          <span>Verification Documents ({referral.documents.length})</span>
+                          <span>Verification Documents ({referral.documents?.length || 0})</span>
                           <span className="text-[10px] text-slate-400 font-normal">Tap item to view full screen & download</span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {referral.documents.map((doc) => (
+                          {referral.documents?.map((doc) => (
                             <div
                               key={doc.id}
                               onClick={() => setSelectedDocPreview({ doc, referralName: referral.name })}
@@ -651,7 +699,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
                       <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleToggleFreezeReferral(referral.id, referral.name)}
+                            onClick={() => handleToggleFreezeReferral(referral)}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
                               isFrozen
                                 ? 'bg-cyan-600 text-white hover:bg-cyan-700'

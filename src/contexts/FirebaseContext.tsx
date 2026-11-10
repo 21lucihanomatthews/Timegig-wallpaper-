@@ -14,6 +14,7 @@ import {
   ActiveGig, 
   LocationPoint 
 } from '../types';
+import { registerReferralToTenant } from '../utils/referral';
 
 interface UserProfile {
   uid: string;
@@ -90,8 +91,37 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             };
             try {
               await setDoc(userDocRef, newProfile);
+
+              // Register referral to tenant if a tenant referral code is stored
+              const storedRefCode = localStorage.getItem('timegig_tenant_ref');
+              if (storedRefCode) {
+                await registerReferralToTenant(
+                  currentUser.uid,
+                  currentUser.email || '',
+                  storedRefCode,
+                  newProfile.name,
+                  newProfile.surname,
+                  newProfile.phone,
+                  'none'
+                );
+              }
             } catch (error) {
               console.warn('Initial profile creation warning:', error);
+            }
+          } else {
+            // If user profile exists but has subscriptionTier === 'none', ensure linked to tenant if referral code present
+            const data = userDoc.data() as UserProfile;
+            const storedRefCode = localStorage.getItem('timegig_tenant_ref');
+            if (storedRefCode && data.subscriptionTier === 'none') {
+              await registerReferralToTenant(
+                currentUser.uid,
+                currentUser.email || data.email,
+                storedRefCode,
+                data.name,
+                data.surname,
+                data.phone,
+                data.subscriptionTier
+              );
             }
           }
 

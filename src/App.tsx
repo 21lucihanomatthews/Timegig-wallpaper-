@@ -353,6 +353,35 @@ export default function App() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    setIsAuthLoading(true);
+    try {
+      const refToUse = referralCodeInput.trim() || detectedTenantRef || localStorage.getItem('timegig_tenant_ref') || '';
+      if (refToUse) {
+        localStorage.setItem('timegig_tenant_ref', refToUse.toUpperCase());
+      }
+      const res = await signInWithGoogle();
+      if (res?.user && refToUse) {
+        await registerReferralToTenant(
+          res.user.uid,
+          res.user.email || '',
+          refToUse,
+          res.user.displayName?.split(' ')[0],
+          res.user.displayName?.split(' ').slice(1).join(' '),
+          '',
+          'none'
+        );
+      }
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setAuthError(err.message || 'Google sign-in failed.');
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
   const handleCompleteOnboarding = async () => {
     if (!user) return;
     try {
@@ -714,7 +743,7 @@ export default function App() {
               </div>
 
               <button
-                onClick={signInWithGoogle}
+                onClick={handleGoogleSignIn}
                 disabled={isAuthLoading}
                 className="w-full flex items-center justify-center gap-3 bg-slate-950/50 hover:bg-slate-950 border border-slate-800 text-white font-bold py-3.5 px-6 rounded-2xl transition-all active:scale-[0.98] cursor-pointer"
               >

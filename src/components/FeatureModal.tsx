@@ -167,6 +167,15 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
         totalProfit: newTotalProfit,
       });
 
+      // Update the referral user's user document (users/{id}) to 'approved'
+      try {
+        await updateDoc(doc(db, 'users', id), {
+          verificationStatus: 'approved',
+        });
+      } catch (userErr) {
+        console.log('Referral user document update:', userErr);
+      }
+
       setReferralActionNotice(`Approved referral application for ${refName}. R250.00 sub-profit dividend credited!`);
       setTimeout(() => setReferralActionNotice(null), 3500);
     } catch (error) {
@@ -180,6 +189,16 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
       await updateDoc(doc(db, 'users', userProfile.uid, 'referrals', id), {
         status: 'rejected',
       });
+
+      // Update the referral user's user document (users/{id}) to 'rejected'
+      try {
+        await updateDoc(doc(db, 'users', id), {
+          verificationStatus: 'rejected',
+        });
+      } catch (userErr) {
+        console.log('Referral user document update:', userErr);
+      }
+
       setReferralActionNotice(`Rejected referral application for ${refName}.`);
       setTimeout(() => setReferralActionNotice(null), 3000);
     } catch (error) {

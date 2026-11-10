@@ -19,7 +19,7 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email'])
         && data.keys().hasOnly(['uid', 'name', 'surname', 'email', 'phone', 'totalProfit', 'tenantSubProfit', 'userSubProfit', 'referralCode', 'hasCompletedOnboarding', 'subscriptionTier', 'verificationStatus', 'verificationSelfieUrl', 'verificationIdUrl', 'verificationPaymentUrl', 'verificationRequestedAt'])
-        && data.uid == request.auth.uid
+        && (data.uid == request.auth.uid || exists(/databases/$(database)/documents/users/$(request.auth.uid)/referrals/$(data.uid)) || exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
         && data.email is string && data.email.size() <= 255
         && (data.name == null || (data.name is string && data.name.size() <= 100))
         && (data.surname == null || (data.surname is string && data.surname.size() <= 100))
@@ -30,7 +30,10 @@ service cloud.firestore {
         && (data.referralCode == null || (data.referralCode is string && data.referralCode.size() <= 50))
         && (data.hasCompletedOnboarding == null || data.hasCompletedOnboarding is bool)
         && (data.subscriptionTier == null || data.subscriptionTier in ['none', 'basic', 'pro'])
-        && (data.verificationStatus == null || data.verificationStatus in ['none', 'pending', 'approved', 'rejected']);
+        && (data.verificationStatus == null || data.verificationStatus in ['none', 'pending', 'approved', 'rejected'])
+        && (data.verificationSelfieUrl == null || (data.verificationSelfieUrl is string && data.verificationSelfieUrl.size() <= 1048576))
+        && (data.verificationIdUrl == null || (data.verificationIdUrl is string && data.verificationIdUrl.size() <= 1048576))
+        && (data.verificationPaymentUrl == null || (data.verificationPaymentUrl is string && data.verificationPaymentUrl.size() <= 1048576));
     }
 
     function isValidReferral(data) {
@@ -43,7 +46,8 @@ service cloud.firestore {
         && (data.unit == null || (data.unit is string && data.unit.size() <= 100))
         && (data.previousStatus == null || data.previousStatus in ['pending', 'approved', 'rejected'])
         && (data.subscriptionTier == null || data.subscriptionTier in ['none', 'basic', 'pro'])
-        && (data.subscriptionActivated == null || data.subscriptionActivated is bool);
+        && (data.subscriptionActivated == null || data.subscriptionActivated is bool)
+        && (data.selfieUrl == null || (data.selfieUrl is string && data.selfieUrl.size() <= 1048576));
     }
 
     function isValidDoc(data) {
@@ -78,8 +82,7 @@ service cloud.firestore {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isOwner(userId) && isVerified() && isValidUser(incoming());
-      allow update: if (isOwner(userId) && isVerified() && isValidUser(incoming()))
-                    || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      allow update: if isSignedIn() && isVerified() && isValidUser(incoming());
       // Prevent deletion of user profiles to maintain billing/history
       allow delete: if false;
 

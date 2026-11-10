@@ -59,7 +59,11 @@ import {
   Link2,
 } from 'lucide-react';
 import { AdminDashboard } from './components/AdminDashboard';
-import { registerReferralToTenant, updateReferralSubscriptionStatus } from './utils/referral';
+import { 
+  registerReferralToTenant, 
+  updateReferralSubscriptionStatus, 
+  updateReferralVerificationInTenant 
+} from './utils/referral';
 
 export default function App() {
   const { user, loading, userProfile, referrals, gigs, savedLocations } = useFirebase();
@@ -1289,25 +1293,57 @@ export default function App() {
                 </div>
               ) : (
                 <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-500">
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight text-center mb-6">Complete Verification</h3>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight text-center mb-1">Complete Verification</h3>
+                  <p className="text-xs text-slate-500 text-center mb-6">
+                    Step 3 of 3: Verification steps for account approval by tenant
+                  </p>
+
                   <div className="space-y-4">
                     {isCapturingSelfie ? (
-                      <div className="relative w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden">
+                      <div className="relative w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden flex flex-col items-center justify-center">
                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                        <button 
-                          className="absolute bottom-4 left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full border-4 border-blue-500 hover:scale-105 transition-transform"
-                          onClick={() => {
-                            setIsCapturingSelfie(false);
-                            if (selfieStream) {
-                              selfieStream.getTracks().forEach(track => track.stop());
-                            }
-                          }}
-                        />
+                        <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-4 px-4">
+                          <button 
+                            type="button"
+                            className="w-14 h-14 bg-white rounded-full border-4 border-blue-600 hover:scale-105 transition-transform flex items-center justify-center shadow-lg cursor-pointer"
+                            onClick={() => {
+                              if (videoRef.current) {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = videoRef.current.videoWidth || 300;
+                                canvas.height = videoRef.current.videoHeight || 300;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                  ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                                  setSelfieStream(null);
+                                }
+                              }
+                              setIsCapturingSelfie(false);
+                              if (selfieStream) {
+                                selfieStream.getTracks().forEach(track => track.stop());
+                              }
+                            }}
+                            title="Capture Photo"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-blue-600" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCapturingSelfie(false);
+                              if (selfieStream) {
+                                selfieStream.getTracks().forEach(track => track.stop());
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-slate-800/80 text-white rounded-xl text-xs font-bold backdrop-blur-sm cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 gap-3">
                         <div 
-                          className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer hover:border-blue-300 transition-colors"
+                          className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer hover:border-blue-300 transition-colors relative"
                           onClick={async () => {
                             setIsCapturingSelfie(true);
                             try {
@@ -1322,22 +1358,27 @@ export default function App() {
                             }
                           }}
                         >
-                          <div className="w-10 h-10 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full animate-bounce">
+                          <div className="w-10 h-10 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full">
                             <UserCheck className="w-5 h-5" />
                           </div>
                           <span className="text-[9px] font-bold text-slate-600 text-center uppercase tracking-wider">Face Selfie</span>
+                          <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold">Ready ✓</span>
                         </div>
+
                         <div className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                          <div className="w-10 h-10 flex items-center justify-center bg-purple-100 text-purple-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}>
+                          <div className="w-10 h-10 flex items-center justify-center bg-purple-100 text-purple-600 rounded-full">
                             <FileText className="w-5 h-5" />
                           </div>
                           <span className="text-[9px] font-bold text-slate-600 text-center uppercase tracking-wider">ID Doc</span>
+                          <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold">Attached ✓</span>
                         </div>
+
                         <div className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                          <div className="w-10 h-10 flex items-center justify-center bg-emerald-100 text-emerald-600 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}>
+                          <div className="w-10 h-10 flex items-center justify-center bg-emerald-100 text-emerald-600 rounded-full">
                             <CreditCard className="w-5 h-5" />
                           </div>
                           <span className="text-[9px] font-bold text-slate-600 text-center uppercase tracking-wider">Payment</span>
+                          <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-extrabold">Confirmed ✓</span>
                         </div>
                       </div>
                     )}
@@ -1345,12 +1386,19 @@ export default function App() {
                     {!isCapturingSelfie && (
                       <button 
                         onClick={async () => {
-                          await updateDoc(doc(db, 'users', userProfile.uid), {
-                            verificationStatus: 'pending',
-                            verificationRequestedAt: serverTimestamp()
-                          });
+                          try {
+                            await updateDoc(doc(db, 'users', userProfile.uid), {
+                              verificationStatus: 'pending',
+                              verificationRequestedAt: serverTimestamp()
+                            });
+
+                            // Update referral record under referring tenant's subcollection
+                            await updateReferralVerificationInTenant(userProfile.uid);
+                          } catch (err) {
+                            console.error("Error submitting verification:", err);
+                          }
                         }}
-                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg transition-all text-xs cursor-pointer"
+                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg transition-all text-xs cursor-pointer active:scale-95"
                       >
                         Submit Verification
                       </button>

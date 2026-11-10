@@ -122,3 +122,42 @@ export async function updateReferralSubscriptionStatus(userId: string, tier: 'ba
     console.error('Error updating referral subscription status:', err);
   }
 }
+
+/**
+ * Updates the referral's verification details (e.g. captured selfieUrl, pending status)
+ * on the referring tenant's subcollection document.
+ */
+export async function updateReferralVerificationInTenant(userId: string, selfieUrl?: string) {
+  const code = (localStorage.getItem('timegig_tenant_ref') || '').trim().toUpperCase();
+  if (!code) return;
+
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('referralCode', '==', code));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const tenantDoc = snap.docs[0];
+      const tenantUid = tenantDoc.id;
+
+      if (tenantUid === userId) return;
+
+      const refDocRef = doc(db, 'users', tenantUid, 'referrals', userId);
+      const refDoc = await getDoc(refDocRef);
+
+      const updateData: any = {
+        status: 'pending',
+      };
+      if (selfieUrl) {
+        updateData.selfieUrl = selfieUrl;
+      }
+
+      if (refDoc.exists()) {
+        await setDoc(refDocRef, updateData, { merge: true });
+        console.log(`Updated referral ${userId} verification in tenant ${tenantUid}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error updating referral verification in tenant:', err);
+  }
+}

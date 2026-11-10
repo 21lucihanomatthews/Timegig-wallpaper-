@@ -56,8 +56,10 @@ import {
   Crown,
   Trophy,
   FileText,
+  Link2,
 } from 'lucide-react';
 import { AdminDashboard } from './components/AdminDashboard';
+import { registerReferralToTenant } from './utils/referral';
 
 export default function App() {
   const { user, loading, userProfile, referrals, gigs, savedLocations } = useFirebase();
@@ -82,6 +84,32 @@ export default function App() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  // Tenant Referral Code State
+  const [referralCodeInput, setReferralCodeInput] = useState('');
+  const [detectedTenantRef, setDetectedTenantRef] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Parse referral code from URL search params or path
+    const urlParams = new URLSearchParams(window.location.search);
+    let ref = urlParams.get('ref') || urlParams.get('referral') || urlParams.get('refCode');
+    if (!ref) {
+      const match = window.location.href.match(/[?&]ref=([A-Za-z0-9_-]+)/i);
+      if (match) ref = match[1];
+    }
+    if (ref) {
+      const cleanRef = ref.trim().toUpperCase();
+      localStorage.setItem('timegig_tenant_ref', cleanRef);
+      setReferralCodeInput(cleanRef);
+      setDetectedTenantRef(cleanRef);
+    } else {
+      const savedRef = localStorage.getItem('timegig_tenant_ref');
+      if (savedRef) {
+        setReferralCodeInput(savedRef);
+        setDetectedTenantRef(savedRef);
+      }
+    }
+  }, []);
 
   // Onboarding & Subscription states
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -294,7 +322,19 @@ export default function App() {
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match.');
         }
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const refToUse = referralCodeInput.trim() || detectedTenantRef || '';
+        if (refToUse && userCred.user) {
+          localStorage.setItem('timegig_tenant_ref', refToUse.toUpperCase());
+          await registerReferralToTenant(
+            userCred.user.uid,
+            email,
+            refToUse,
+            userProfile?.name,
+            userProfile?.surname,
+            userProfile?.phone
+          );
+        }
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
@@ -315,6 +355,18 @@ export default function App() {
       await updateDoc(doc(db, 'users', user.uid), {
         hasCompletedOnboarding: true,
       });
+      // Register referral link if code is present
+      const refToUse = referralCodeInput.trim() || detectedTenantRef || '';
+      if (refToUse) {
+        await registerReferralToTenant(
+          user.uid,
+          user.email || email,
+          refToUse,
+          userProfile?.name,
+          userProfile?.surname,
+          userProfile?.phone
+        );
+      }
       setShowOnboarding(false);
       setActiveTab('gigs');
     } catch (error) {
@@ -591,6 +643,25 @@ export default function App() {
                           className="w-full bg-slate-950/50 border border-slate-800 text-white px-11 py-3.5 rounded-2xl text-xs outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-600"
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="relative group">
+                        <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                        <input 
+                          type="text"
+                          placeholder="Tenant Referral Code (Optional)"
+                          value={referralCodeInput}
+                          onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                          className="w-full bg-slate-950/50 border border-slate-800 text-white px-11 py-3.5 rounded-2xl text-xs outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-600 uppercase font-mono tracking-wider"
+                        />
+                      </div>
+                      {detectedTenantRef && (
+                        <p className="text-[10px] text-blue-400 font-bold px-1.5 flex items-center gap-1">
+                          <Check className="w-3 h-3 text-blue-400 shrink-0" />
+                          <span>Joined via Tenant Link: {detectedTenantRef}</span>
+                        </p>
+                      )}
                     </div>
 
                     <label className="flex items-start gap-3 cursor-pointer group">

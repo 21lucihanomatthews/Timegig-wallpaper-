@@ -38,6 +38,7 @@ import {
 import { SEEKERS_STORIES } from '../data/seekersAndReferrals';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { registerReferralToTenant } from '../utils/referral';
 
 interface FeatureModalProps {
   activeTab: string | null;
@@ -140,6 +141,8 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
         email,
         phone: contact,
       });
+      // Register or update referral record if user joined via a tenant link
+      await registerReferralToTenant(userProfile.uid, email, undefined, name, surname, contact);
       setSavedProfile(true);
       setTimeout(() => setSavedProfile(false), 3000);
     } catch (error) {
@@ -154,8 +157,17 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
       await updateDoc(doc(db, 'users', userProfile.uid, 'referrals', id), {
         status: 'approved',
       });
-      setReferralActionNotice(`Approved referral application for ${refName}.`);
-      setTimeout(() => setReferralActionNotice(null), 3000);
+
+      // Credit R250.00 sub-profit override dividend to tenant upon approval
+      const newTenantSubProfit = (userProfile.tenantSubProfit || 0) + 250;
+      const newTotalProfit = (userProfile.totalProfit || 0) + 250;
+      await updateDoc(doc(db, 'users', userProfile.uid), {
+        tenantSubProfit: newTenantSubProfit,
+        totalProfit: newTotalProfit,
+      });
+
+      setReferralActionNotice(`Approved referral application for ${refName}. R250.00 sub-profit dividend credited!`);
+      setTimeout(() => setReferralActionNotice(null), 3500);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userProfile.uid}/referrals/${id}`);
     }
@@ -580,8 +592,32 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
             {/* Referrals List: Separate Bubbles */}
             <div className="space-y-4">
               {filteredReferrals.length === 0 ? (
-                <div className="p-8 text-center bg-white/90 rounded-3xl border border-white/60 shadow-lg text-slate-500 text-xs">
-                  No tenant referrals matched your search.
+                <div className="p-8 text-center bg-white/95 backdrop-blur-md rounded-3xl border border-white/80 shadow-xl space-y-4">
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <Users className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold text-slate-900">No Referral Applications Yet</h4>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                      Share your unique tenant referral link with partners and prospective tenants. Anyone who signs up using your link will automatically appear here for you to view, approve, or reject.
+                    </p>
+                  </div>
+                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+                    <button
+                      onClick={handleCopyLink}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
+                    >
+                      {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedLink ? 'Link Copied!' : 'Copy Tenant Link'}</span>
+                    </button>
+                    <button
+                      onClick={handleShareLink}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>Share Link</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 filteredReferrals.map((referral) => {

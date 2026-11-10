@@ -35,7 +35,7 @@ service cloud.firestore {
 
     function isValidReferral(data) {
       return data.keys().hasAll(['id', 'name', 'email', 'status'])
-        && data.keys().hasOnly(['id', 'name', 'email', 'phone', 'unit', 'status', 'previousStatus', 'joinedDate', 'selfieUrl'])
+        && data.keys().hasOnly(['id', 'name', 'email', 'phone', 'unit', 'status', 'previousStatus', 'joinedDate', 'selfieUrl', 'documents', 'referralCode'])
         && data.id is string && data.id.size() <= 128
         && data.name is string && data.name.size() <= 100
         && data.email is string && data.email.size() <= 255
@@ -73,8 +73,8 @@ service cloud.firestore {
     // --- Path Matches ---
 
     match /users/{userId} {
-      allow list: if isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      allow get: if isOwner(userId) || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isOwner(userId) && isVerified() && isValidUser(incoming());
       allow update: if (isOwner(userId) && isVerified() && isValidUser(incoming()))
                     || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
@@ -84,16 +84,16 @@ service cloud.firestore {
       match /referrals/{referralId} {
         allow list: if isOwner(userId);
         allow get: if isOwner(userId) && isValidId(referralId);
-        allow create: if isOwner(userId) && isVerified() && isValidReferral(incoming()) && isValidId(referralId);
-        allow update: if isOwner(userId) && isVerified() && isValidReferral(incoming()) && isValidId(referralId);
-        allow delete: if isOwner(userId) && isVerified() && isValidId(referralId);
+        allow create: if (isOwner(userId) || (isSignedIn() && request.auth.uid == referralId)) && isValidReferral(incoming()) && isValidId(referralId);
+        allow update: if isOwner(userId) && isValidReferral(incoming()) && isValidId(referralId);
+        allow delete: if isOwner(userId) && isValidId(referralId);
 
         match /documents/{docId} {
           allow list: if isOwner(userId);
           allow get: if isOwner(userId) && isValidId(docId);
-          allow create: if isOwner(userId) && isVerified() && isValidDoc(incoming()) && isValidId(docId);
-          allow update: if isOwner(userId) && isVerified() && isValidDoc(incoming()) && isValidId(docId);
-          allow delete: if isOwner(userId) && isVerified() && isValidId(docId);
+          allow create: if (isOwner(userId) || (isSignedIn() && request.auth.uid == referralId)) && isValidDoc(incoming()) && isValidId(docId);
+          allow update: if isOwner(userId) && isValidDoc(incoming()) && isValidId(docId);
+          allow delete: if isOwner(userId) && isValidId(docId);
         }
       }
 

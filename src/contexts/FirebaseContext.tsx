@@ -50,90 +50,117 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [savedLocations, setSavedLocations] = useState<LocationPoint[]>([]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Safety timeout: Never let the app hang on "Syncing Cloud Data..." for more than 3.5 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 3500);
+
+    let unsubProfile: (() => void) | undefined;
+    let unsubReferrals: (() => void) | undefined;
+    let unsubGigs: (() => void) | undefined;
+    let unsubLocations: (() => void) | undefined;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (!isMounted) return;
       setUser(currentUser);
       
       if (currentUser) {
-        // Ensure user document exists
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (!userDoc.exists()) {
-          const newProfile: UserProfile = {
-            uid: currentUser.uid,
-            name: currentUser.displayName?.split(' ')[0] || '',
-            surname: currentUser.displayName?.split(' ').slice(1).join(' ') || '',
-            email: currentUser.email || '',
-            phone: '',
-            totalProfit: 0,
-            tenantSubProfit: 0,
-            userSubProfit: 0,
-            referralCode: `GEO-${currentUser.uid.slice(0, 6).toUpperCase()}`,
-            hasCompletedOnboarding: false,
-            subscriptionTier: 'none'
-          };
-          try {
-            await setDoc(userDocRef, newProfile);
-          } catch (error) {
-            handleFirestoreError(error, OperationType.CREATE, `users/${currentUser.uid}`);
+        try {
+          // Ensure user document exists
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (!userDoc.exists()) {
+            const newProfile: UserProfile = {
+              uid: currentUser.uid,
+              name: currentUser.displayName?.split(' ')[0] || '',
+              surname: currentUser.displayName?.split(' ').slice(1).join(' ') || '',
+              email: currentUser.email || '',
+              phone: '',
+              totalProfit: 0,
+              tenantSubProfit: 0,
+              userSubProfit: 0,
+              referralCode: `GEO-${currentUser.uid.slice(0, 6).toUpperCase()}`,
+              hasCompletedOnboarding: false,
+              subscriptionTier: 'none'
+            };
+            try {
+              await setDoc(userDocRef, newProfile);
+            } catch (error) {
+              console.warn('Initial profile creation warning:', error);
+            }
+          }
+
+          // Listen to User Profile
+          unsubProfile = onSnapshot(userDocRef, (doc) => {
+            if (doc.exists() && isMounted) {
+              setUserProfile(doc.data() as UserProfile);
+            }
+          }, (error) => console.warn('User profile listener notice:', error));
+
+          // Listen to Referrals
+          const referralsRef = collection(db, 'users', currentUser.uid, 'referrals');
+          unsubReferrals = onSnapshot(query(referralsRef), (snapshot) => {
+            if (!isMounted) return;
+            const refs: TenantReferral[] = [];
+            snapshot.forEach((doc) => {
+              refs.push({ id: doc.id, ...doc.data() } as TenantReferral);
+            });
+            setReferrals(refs);
+          }, (error) => console.warn('Referrals listener notice:', error));
+
+          // Listen to Gigs
+          const gigsRef = collection(db, 'users', currentUser.uid, 'gigs');
+          unsubGigs = onSnapshot(query(gigsRef), (snapshot) => {
+            if (!isMounted) return;
+            const gList: ActiveGig[] = [];
+            snapshot.forEach((doc) => {
+              gList.push({ id: doc.id, ...doc.data() } as ActiveGig);
+            });
+            setGigs(gList);
+          }, (error) => console.warn('Gigs listener notice:', error));
+
+          // Listen to Saved Locations
+          const locationsRef = collection(db, 'users', currentUser.uid, 'locations');
+          unsubLocations = onSnapshot(query(locationsRef), (snapshot) => {
+            if (!isMounted) return;
+            const locs: LocationPoint[] = [];
+            snapshot.forEach((doc) => {
+              locs.push({ id: doc.id, ...doc.data() } as LocationPoint);
+            });
+            setSavedLocations(locs);
+          }, (error) => console.warn('Locations listener notice:', error));
+        } catch (error) {
+          console.warn('Cloud sync initialization notice:', error);
+        } finally {
+          if (isMounted) {
+            setLoading(false);
           }
         }
-
-        // Listen to User Profile
-        const unsubProfile = onSnapshot(userDocRef, (doc) => {
-          if (doc.exists()) {
-            setUserProfile(doc.data() as UserProfile);
-          }
-        }, (error) => handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`));
-
-        // Listen to Referrals
-        const referralsRef = collection(db, 'users', currentUser.uid, 'referrals');
-        const unsubReferrals = onSnapshot(query(referralsRef), (snapshot) => {
-          const refs: TenantReferral[] = [];
-          snapshot.forEach((doc) => {
-            refs.push({ id: doc.id, ...doc.data() } as TenantReferral);
-          });
-          setReferrals(refs);
-        }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${currentUser.uid}/referrals`));
-
-        // Listen to Gigs
-        const gigsRef = collection(db, 'users', currentUser.uid, 'gigs');
-        const unsubGigs = onSnapshot(query(gigsRef), (snapshot) => {
-          const gList: ActiveGig[] = [];
-          snapshot.forEach((doc) => {
-            gList.push({ id: doc.id, ...doc.data() } as ActiveGig);
-          });
-          setGigs(gList);
-        }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${currentUser.uid}/gigs`));
-
-        // Listen to Saved Locations
-        const locationsRef = collection(db, 'users', currentUser.uid, 'locations');
-        const unsubLocations = onSnapshot(query(locationsRef), (snapshot) => {
-          const locs: LocationPoint[] = [];
-          snapshot.forEach((doc) => {
-            locs.push({ id: doc.id, ...doc.data() } as LocationPoint);
-          });
-          setSavedLocations(locs);
-        }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${currentUser.uid}/locations`));
-
-        setLoading(false);
-
-        return () => {
-          unsubProfile();
-          unsubReferrals();
-          unsubGigs();
-          unsubLocations();
-        };
       } else {
         setUserProfile(null);
         setReferrals([]);
         setGigs([]);
         setSavedLocations([]);
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+      unsubscribeAuth();
+      if (unsubProfile) unsubProfile();
+      if (unsubReferrals) unsubReferrals();
+      if (unsubGigs) unsubGigs();
+      if (unsubLocations) unsubLocations();
+    };
   }, []);
 
   return (

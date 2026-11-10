@@ -57,10 +57,12 @@ import {
   Trophy,
   FileText,
 } from 'lucide-react';
+import { AdminDashboard } from './components/AdminDashboard';
 
 export default function App() {
   const { user, loading, userProfile, referrals, gigs, savedLocations } = useFirebase();
   const [isCapturingSelfie, setIsCapturingSelfie] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(true);
   const [selfieStream, setSelfieStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [center, setCenter] = useState<[number, number]>([-33.9249, 18.4241]); // Default hub Cape Town
@@ -1187,7 +1189,7 @@ export default function App() {
           )}
 
           {/* VERIFICATION FLOW MODAL (Mandatory after Subscription) */}
-          {userProfile && userProfile.subscriptionTier !== 'none' && userProfile.verificationStatus !== 'approved' && (
+          {userProfile && userProfile.subscriptionTier !== 'none' && userProfile.verificationStatus !== 'approved' && showReviewModal && (
             <div className="fixed inset-0 z-[10000] bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-500 overflow-y-auto">
               {userProfile.verificationStatus === 'pending' ? (
                 <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl border border-blue-100 animate-in zoom-in-95 duration-500">
@@ -1198,6 +1200,12 @@ export default function App() {
                   <p className="text-slate-500 text-sm mt-2">
                     Your verification documents are being processed. This typically takes 15 to 25 minutes. You can continue to view the map, but features will be inactive until approved.
                   </p>
+                  <button 
+                    onClick={() => setShowReviewModal(false)}
+                    className="mt-4 w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold"
+                  >
+                    Close
+                  </button>
                 </div>
               ) : (
                 <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-500">
@@ -1274,6 +1282,9 @@ export default function App() {
           )}
 
           {/* Bottom Navigation Menu */}
+          {userProfile?.uid === 'OikuRWSHysVsqrOSAaUggIduAJH2' && (
+             <AdminDashboard />
+          )}
           <BottomMenuBar activeTab={activeTab} onTabChange={handleTabChange} />
         </>
       )}

@@ -73,9 +73,11 @@ service cloud.firestore {
     // --- Path Matches ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow list: if isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow get: if isOwner(userId) || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
       allow create: if isOwner(userId) && isVerified() && isValidUser(incoming());
-      allow update: if isOwner(userId) && isVerified() && isValidUser(incoming());
+      allow update: if (isOwner(userId) && isVerified() && isValidUser(incoming()))
+                    || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
       // Prevent deletion of user profiles to maintain billing/history
       allow delete: if false;
 
@@ -110,6 +112,10 @@ service cloud.firestore {
         allow update: if isOwner(userId) && isVerified() && isValidLocation(incoming()) && isValidId(locationId);
         allow delete: if isOwner(userId) && isVerified() && isValidId(locationId);
       }
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if isSignedIn() && request.auth.uid == adminId;
     }
   }
 }

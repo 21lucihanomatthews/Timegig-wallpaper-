@@ -417,6 +417,23 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
               </div>
             )}
 
+            {/* Referral Link Section */}
+            <div className="p-5 rounded-3xl bg-blue-50 border border-blue-100 space-y-3">
+              <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider">Your Referral Link</h4>
+              <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-blue-200">
+                <span className="font-mono text-xs text-slate-700 truncate flex-1 px-1">
+                  {tenantReferralLink}
+                </span>
+                <button
+                  onClick={handleCopyLink}
+                  className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-xs cursor-pointer"
+                  title="Copy Link"
+                >
+                  {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
             {/* Required Fields Form */}
             <form onSubmit={handleProfileSubmit} className="space-y-5 bg-slate-50 p-6 rounded-3xl border border-slate-200">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Required Personal Information</h4>
